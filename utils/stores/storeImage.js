@@ -66,6 +66,11 @@ const storage = multer.diskStorage({
         }
         dir = path.join(`assets/images/categories/${categoryId}`);
         break;
+      case "video":
+      case "videoThumbnail":
+        const { videoId } = req.params;
+        dir = path.join(`assets/videos/${videoId}`);
+        break;
     }
 
     fs.mkdir(dir, { recursive: true }, (err) => {
@@ -102,35 +107,29 @@ const storage = multer.diskStorage({
         fileName = `${baseName}${ext}`;
         dirPath = path.join(`assets/images/categories/${categoryId}`);
         break;
+      case "video":
+      case "videoThumbnail":
+        const { videoId } = req.params;
+        fileName = `${baseName}${ext}`;
+        dirPath = path.join(`assets/videos/${videoId}`);
+        break;
+      case "thumbnailImg":
+        dir = path.join(`assets/images/stream-thumbnail`);
+        break;
+      default:
+        logger.error(`Unknown field name: ${file.fieldname}`);
+        return cb(`Error: Unknown field name '${file.fieldname}'`);
     }
-
-    // Check for existing files with the same base name but different extensions
-    // fs.readdir(dirPath, async (err, files) => {
-    //   if (err) {
-    //     logger.error(`Failed to read directory ${dirPath}: ${err.message}`);
-    //     return cb(err);
-    //   }
-    //   // Find and delete files with the same base name but different extensions
-    //   for (const fileName of files) {
-    //     const existingBaseName = path.parse(fileName).name;
-    //     if (existingBaseName === baseName) {
-    //       const existingFilePath = path.join(dirPath, fileName);
-    //       try {
-    //         await deleteFile(existingFilePath);
-    //       } catch (unlinkErr) {
-    //         return cb(unlinkErr);
-    //       }
-    //     }
-    //   }
-    // });
-    // Proceed to save the new file
     logger.info(`Saving file ${fileName} successfully to ${dirPath}`);
     cb(null, fileName);
   },
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif/;
+  let allowedTypes = /jpeg|jpg|png|gif/;
+  if (file.fieldname === "video") {
+    allowedTypes = /mp4|avi|flv|wmv/;
+  }
   const mimeType = allowedTypes.test(file.mimetype);
   const extName = allowedTypes.test(
     path.extname(file.originalname).toLowerCase()
@@ -142,10 +141,28 @@ const fileFilter = (req, file, cb) => {
   logger.error("Error: Images Only!");
 };
 
+const videoFilter = (req, file, cb) => {
+  const allowedTypes = /mp4|avi|flv|wmv/;
+  const mimeType = allowedTypes.test(file.mimetype);
+  const extName = allowedTypes.test(
+    path.extname(file.originalname).toLowerCase()
+  );
+
+  if (mimeType && extName) {
+    return cb(null, true);
+  }
+  logger.error("Error: Videos Only!");
+};
+
 const uploadImage = multer({
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 25 * 1024 * 1024 }, // Limit  size to 25MB
 });
 
-module.exports = { uploadImage, deleteFile, checkFileSuccess };
+const uploadVideo = multer({
+  storage: storage,
+  fileFilter: videoFilter,
+  limits: { fileSize: 1024 * 1024 * 1024 * 2 }, //Limit size to 2GB
+});
+
+module.exports = { uploadImage, uploadVideo, deleteFile, checkFileSuccess };
